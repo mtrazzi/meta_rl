@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-"""Basic random agent for DeepMind Lab."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -31,8 +30,20 @@ def _action(*entries):
   return np.array(entries, dtype=np.intc)
 
 
-class DiscretizedRandomAgent(object):
-  """Simple agent for DeepMind Lab."""
+class MetaRLAgent(object):
+  """
+  Agent implementing MetaRL for the Harlow task as described in 
+
+  Wang, J. X., Kurth-Nelson, Z., Tirumala, D., Soyer, H., Leibo, J. Z., Munos, R.,
+  ... & Botvinick, M. (2016). Learning to reinforcement learn. arXiv preprint
+  arXiv:1611.05763.
+
+  and
+
+  Wang, J. X., Kurth-Nelson, Z., Kumaran, D., Tirumala, D., Soyer, H., Leibo,
+  J. Z., ... & Botvinick, M. (2018). Prefrontal cortex as a meta-reinforcement
+  learning system. Nature neuroscience, 21(6), 860.
+  """
 
   ACTIONS = {
       'look_left': _action(-120, 0, 0, 0, 0, 0, 0),
@@ -41,19 +52,20 @@ class DiscretizedRandomAgent(object):
 
   ACTION_LIST = list(six.viewvalues(ACTIONS))
 
-  def __init__(self)
+  def __init__(self):
     self.i = 0
 
     self.rewards = 0
 
   def step(self, reward, unused_image):
+    """defines what is the next action using the previous reward and current observation (==current frame)"""
     self.i += 1
     self.rewards += reward
     print("Score:", self.rewards)
-    return random.choice(DiscretizedRandomAgent.ACTION_LIST[0:1]) if self.i % 2 == 0 else random.choice(DiscretizedRandomAgent.ACTION_LIST[1:2])
+    return random.choice(MetaRLAgent.ACTION_LIST[0:1]) if self.i % 2 == 0 else random.choice(MetaRLAgent.ACTION_LIST[1:2])
     
     """Gets an image state and a reward, returns an action."""
-    return random.choice(DiscretizedRandomAgent.ACTION_LIST)
+    return random.choice(MetaRLAgent.ACTION_LIST)
   
   def reset(self):
     pass
@@ -76,9 +88,14 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     config['video'] = video
   env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
 
+  # testing the wrapper env
+  wrapped_env = wrapper_env(env)
+  wrapped_env.step()
+  wrapped_env.reset()
+
   env.reset()
 
-  agent = DiscretizedRandomAgent()
+  agent = MetaRLAgent()
 
   reward = 0
 
@@ -93,6 +110,34 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
   print('Finished after %i steps. Total reward received is %f'
         % (length, agent.rewards))
+
+class wrapper_env(object):
+  """A gym-like wrapper environment for DeepMind Lab.
+
+  Attributes:
+      env: The corresponding DeepMind Lab environment.
+      timestep: the number of frames/actions since the beginnning.
+
+  Args:
+      env (deepmind_lab.Lab): DeepMind Lab environment.
+
+  """
+  def __init__(self, env):
+
+    self.env = env
+    self.timestep = 0
+
+  def observations(self):
+    return env.observations()
+  def step(self, action):
+    reward = self.env.step(action, num_steps=1)
+    obs = self.observations()
+    
+    #self.env.step()
+  def reset(self):
+    self.env.reset()
+    return self.observations()
+    
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description=__doc__)
