@@ -103,8 +103,8 @@ class Worker():
 
         while d == False:
           #possible switch of S_2 <-> S_3 with probability 2.5% at the beginning of a trial (every two steps)
-          if (self.env.state == S_1):
-            self.env.possible_switch()
+          # if (self.env.state == S_1):
+          #   self.env.possible_switch()
 
           #Take an action using probabilities from policy network output.
           a_dist,v,rnn_state_new = sess.run([self.local_AC.policy,self.local_AC.value,self.local_AC.state_out],

@@ -41,7 +41,7 @@ class DiscretizedRandomAgent(object):
 
   ACTION_LIST = list(six.viewvalues(ACTIONS))
 
-  def __init__(self):
+  def __init__(self)
     self.i = 0
 
     self.rewards = 0
@@ -49,7 +49,6 @@ class DiscretizedRandomAgent(object):
   def step(self, reward, unused_image):
     self.i += 1
     self.rewards += reward
-    print(unused_image.shape)
     print("Score:", self.rewards)
     return random.choice(DiscretizedRandomAgent.ACTION_LIST[0:1]) if self.i % 2 == 0 else random.choice(DiscretizedRandomAgent.ACTION_LIST[1:2])
     
@@ -94,7 +93,6 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
   print('Finished after %i steps. Total reward received is %f'
         % (length, agent.rewards))
-
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description=__doc__)
