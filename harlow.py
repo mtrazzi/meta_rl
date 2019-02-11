@@ -37,15 +37,6 @@ class DiscretizedRandomAgent(object):
   ACTIONS = {
       'look_left': _action(-120, 0, 0, 0, 0, 0, 0),
       'look_right': _action(120, 0, 0, 0, 0, 0, 0),
-      # 'look_up': _action(0, 10, 0, 0, 0, 0, 0),
-      # 'look_down': _action(0, -10, 0, 0, 0, 0, 0),
-      # 'strafe_left': _action(0, 0, -1, 0, 0, 0, 0),
-      # 'strafe_right': _action(0, 0, 1, 0, 0, 0, 0),
-      # 'forward': _action(0, 0, 0, 1, 0, 0, 0),
-      # 'backward': _action(0, 0, 0, -1, 0, 0, 0),
-      # 'fire': _action(0, 0, 0, 0, 1, 0, 0),
-      # 'jump': _action(0, 0, 0, 0, 0, 1, 0),
-      # 'crouch': _action(0, 0, 0, 0, 0, 0, 1)
   }
 
   ACTION_LIST = list(six.viewvalues(ACTIONS))
@@ -69,94 +60,6 @@ class DiscretizedRandomAgent(object):
     pass
 
 
-class SpringAgent(object):
-  """A random agent using spring-like forces for its action evolution."""
-
-  def __init__(self, action_spec):
-    self.action_spec = action_spec
-    print('Starting random spring agent. Action spec:', action_spec)
-
-    self.omega = np.array([
-        0.1,  # look left-right
-        0,    # look up-down
-        # 0.1,  # look up-down
-        0,    # strafe left-right
-        # 0.1,  # strafe left-right
-        0,    # forward-backward
-        # 0.1,  # forward-backward
-        0.0,  # fire
-        0.0,  # jumping
-        0.0  # crouching
-    ])
-
-    self.velocity_scaling = np.array([2.5, 2.5, 0.01, 0.01, 1, 1, 1])
-
-    self.indices = {a['name']: i for i, a in enumerate(self.action_spec)}
-    self.mins = np.array([a['min'] for a in self.action_spec])
-    self.maxs = np.array([a['max'] for a in self.action_spec])
-    self.reset()
-
-    self.rewards = 0
-
-  def critically_damped_derivative(self, t, omega, displacement, velocity):
-    r"""Critical damping for movement.
-
-    I.e., x(t) = (A + Bt) \exp(-\omega t) with A = x(0), B = x'(0) + \omega x(0)
-
-    See
-      https://en.wikipedia.org/wiki/Damping#Critical_damping_.28.CE.B6_.3D_1.29
-    for details.
-
-    Args:
-      t: A float representing time.
-      omega: The undamped natural frequency.
-      displacement: The initial displacement at, x(0) in the above equation.
-      velocity: The initial velocity, x'(0) in the above equation
-
-    Returns:
-       The velocity x'(t).
-    """
-    a = displacement
-    b = velocity + omega * displacement
-    return (b - omega * t * (a + t * b)) * np.exp(-omega * t)
-
-  def step(self, reward, unused_frame):
-    """Gets an image state and a reward, returns an action."""
-    self.rewards += reward
-
-    action = (self.maxs - self.mins) * np.random.random_sample(
-        size=[len(self.action_spec)]) + self.mins
-
-    # Compute the 'velocity' 1 time unit after a critical damped force
-    # dragged us towards the random `action`, given our current velocity.
-    self.velocity = self.critically_damped_derivative(1, self.omega, action,
-                                                      self.velocity)
-
-    # Since walk and strafe are binary, we need some additional memory to
-    # smoothen the movement. Adding half of action from the last step works.
-    self.action = self.velocity / self.velocity_scaling + 0.5 * self.action
-
-    # Fire with p = 0.01 at each step
-    # self.action[self.indices['FIRE']] = int(np.random.random() > 0.99)
-
-    # Jump/crouch with p = 0.005 at each step
-    # self.action[self.indices['JUMP']] = int(np.random.random() > 0.995)
-    # self.action[self.indices['CROUCH']] = int(np.random.random() > 0.995)
-
-    # No operations
-    # self.action = np.zeros([len(self.action_spec)])
-
-    # Clip to the valid range and convert to the right dtype
-    return self.clip_action(self.action)
-
-  def clip_action(self, action):
-    return np.clip(action, self.mins, self.maxs).astype(np.intc)
-
-  def reset(self):
-    self.velocity = np.zeros([len(self.action_spec)])
-    self.action = np.zeros([len(self.action_spec)])
-
-
 def run(length, width, height, fps, level, record, demo, demofiles, video):
   """Spins up an environment and runs the random agent."""
   config = {
@@ -176,9 +79,6 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
   env.reset()
 
-  # Starts the random spring agent. As a simpler alternative, we could also
-  # use DiscretizedRandomAgent().
-  # agent = SpringAgent(env.action_spec())
   agent = DiscretizedRandomAgent()
 
   reward = 0
