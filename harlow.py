@@ -80,14 +80,14 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     config['video'] = video
   env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
 
-  dir_name = "train_" + datetime.now().strftime("%m%d-%H%M%S")
+  dir_name = "/sgoinfre/goinfre/Perso/kcosta/lab/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
 
   # Hyperparameters for training/testing
   gamma = .91
   a_size = 2
   n_seeds = 1
   num_episode_train = 20000
-  num_episode_test = length
+  num_episode_test = 50
   collect_seed_transition_probs = []
   for seed_nb in range(n_seeds):
 

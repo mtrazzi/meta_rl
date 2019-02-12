@@ -7,6 +7,7 @@ from utils import *
 from ac_network import AC_Network
 # import matplotlib.pyplot as plt
 
+import os
 import random
 import six
 
@@ -170,49 +171,55 @@ class Worker():
         if len(episode_buffer) != 0 and train == True:
           v_l,p_l,e_l,g_n,v_n = self.train(episode_buffer,sess,gamma,0.0)
 
-        # # Periodically save gifs of episodes, model parameters, and summary statistics.
-        # if episode_count % 10 == 0 and episode_count != 0:
-        #   if episode_count % 100 == 0 and self.name == 'worker_0':
-        #     if train == True:
-        #       # save model
-        #       os.makedirs(model_path+'/model-'+str(episode_count))
-        #       saver.save(sess,model_path+'/model-'+str(episode_count)+
-        #             '/model-'+str(episode_count)+'.cptk')
-        #       print ("Saved Model")
+        # Periodically save gifs of episodes, model parameters, and summary statistics.
+        if episode_count % 1 == 0 and episode_count != 0:
+          if episode_count % 1 == 0:# and self.name == 'worker_0':
+            if train == True:
+              # save model
+              os.makedirs(self.model_path+'/model-'+str(episode_count))
+              # saver.save(sess,model_path+'/model-'+str(episode_count)+
+              #       '/model-'+str(episode_count)+'.cptk')
+              print ("Saved Model")
 
-        #       # generate plot
-        #       self.plot(episode_count,train)
-        #       print ("Saved Plot")
+              # generate plot
+              self.plot(episode_count,train)
+              print ("Saved Plot")
 
-        #     if self.make_gif and (not train):
-        #       # generate gif
-        #       make_gif(episode_frames,self.frame_path+"/test_"+str(episode_count)+'.gif')
-        #       print ("Saved Gif")
+            if self.make_gif and (not train):
+              # generate gif
+              make_gif(episode_frames,self.frame_path+"/test_"+str(episode_count)+'.gif')
+              print ("Saved Gif")
 
-        #   # only track datapoints for training every 10 episoodes
-        #   if train == True:
-        #     # For Tensorboard
-        #     mean_reward = np.mean(self.episode_rewards[-10:])
-        #     mean_length = np.mean(self.episode_lengths[-10:])
-        #     mean_value = np.mean(self.episode_mean_values[-10:])
-        #     summary = tf.Summary()
-        #     summary.value.add(tag='Perf/Reward', simple_value=float(mean_reward))
-        #     summary.value.add(tag='Perf/Length', simple_value=float(mean_length))
-        #     summary.value.add(tag='Perf/Value', simple_value=float(mean_value))
-        #     if train == True:
-        #       summary.value.add(tag='Losses/Value Loss', simple_value=float(v_l))
-        #       summary.value.add(tag='Losses/Policy Loss', simple_value=float(p_l))
-        #       summary.value.add(tag='Losses/Entropy', simple_value=float(e_l))
-        #       summary.value.add(tag='Losses/Grad Norm', simple_value=float(g_n))
-        #       summary.value.add(tag='Losses/Var Norm', simple_value=float(v_n))
-        #     self.summary_writer.add_summary(summary, episode_count)
+          # only track datapoints for training every 10 episoodes
+          if train == True:
+            # For Tensorboard
+            mean_reward = np.mean(self.episode_rewards[-10:])
+            mean_length = np.mean(self.episode_lengths[-10:])
+            mean_value = np.mean(self.episode_mean_values[-10:])
+            summary = tf.Summary()
+            summary.value.add(tag='Perf/Reward', simple_value=float(mean_reward))
+            summary.value.add(tag='Perf/Length', simple_value=float(mean_length))
+            summary.value.add(tag='Perf/Value', simple_value=float(mean_value))
+            if train == True:
+              summary.value.add(tag='Losses/Value Loss', simple_value=float(v_l))
+              summary.value.add(tag='Losses/Policy Loss', simple_value=float(p_l))
+              summary.value.add(tag='Losses/Entropy', simple_value=float(e_l))
+              summary.value.add(tag='Losses/Grad Norm', simple_value=float(g_n))
+              summary.value.add(tag='Losses/Var Norm', simple_value=float(v_n))
+            self.summary_writer.add_summary(summary, episode_count)
 
-        #     self.summary_writer.flush()
-        # if self.name == 'worker_0':
-        #   sess.run(self.increment)
-        # episode_count += 1
-        # if (episode_count % 10 == 0):
-        #   print("episode_count is: ", episode_count)
+            self.summary_writer.flush()
+        if self.name == 'worker_0':
+          sess.run(self.increment)
+        episode_count += 1
+        if (episode_count % 1 == 0):
+          for _ in range(5):
+            print
+          print "#####################################################################################"
+          print ">>>>>>>>>>>>>>>>>>>                           " +   str(episode_count) + "            <<<<<<<<<<<<<<<<<<<<<<<<<<"
+          print "#####################################################################################"
+          for _ in range(5):
+            print
 
     if not train:
       self.plot(episode_count-1, train)
