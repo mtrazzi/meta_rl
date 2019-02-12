@@ -80,7 +80,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     config['video'] = video
   env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
 
-  dir_name = "/sgoinfre/goinfre/Perso/kcosta/lab/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
+  dir_name = "/sgoinfre/goinfre/Perso/mtrazzi/python2_lab/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
 
   # Hyperparameters for training/testing
   gamma = .91
@@ -116,10 +116,14 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
       with tf.device("/cpu:0"):
         global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
         trainer = tf.train.RMSPropOptimizer(learning_rate=7.5e-4)
-        master_network = AC_Network(a_size,'global',None) # Generate global network
+        master_network = AC_Network(a_size,'global',None, width, height) # Generate global network
         num_worker = 1
         # Create worker classes
-        worker = Worker(WrapperEnv(env, length), num_worker, a_size, trainer, model_path, global_episodes, make_gif=False, collect_seed_transition_probs=collect_seed_transition_probs, plot_path=plot_path, frame_path=frame_path)
+        worker = Worker(WrapperEnv(env, length), num_worker, a_size, trainer,
+                        model_path, global_episodes, make_gif=False,
+                        collect_seed_transition_probs=collect_seed_transition_probs,
+                        plot_path=plot_path, frame_path=frame_path,
+                        width=width, height=height)
         saver = tf.train.Saver(max_to_keep=5)
 
       with tf.Session() as sess:

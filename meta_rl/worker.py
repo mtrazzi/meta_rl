@@ -32,7 +32,11 @@ class Worker():
 
   ACTION_LIST = list(six.viewvalues(ACTIONS))
 
-  def __init__(self,game,name,a_size,trainer,model_path,global_episodes,make_gif=False, collect_seed_transition_probs=[], plot_path="", frame_path=""):
+  def __init__(self,game,name,a_size,trainer,model_path,global_episodes,
+                make_gif, collect_seed_transition_probs,
+                plot_path, frame_path, width, height):
+    self.width = width
+    self.height = height
     self.name = "worker_" + str(name)
     self.number = name
     self.model_path = model_path
@@ -45,7 +49,7 @@ class Worker():
     self.summary_writer = tf.summary.FileWriter(model_path)
 
     #Create the local copy of the network and the tensorflow op to copy global paramters to local network
-    self.local_AC = AC_Network(a_size,self.name,trainer)
+    self.local_AC = AC_Network(a_size,self.name,trainer, width, height)
     self.update_local_ops = update_target_graph('global',self.name)
     self.env = game
     self.make_gif = make_gif
