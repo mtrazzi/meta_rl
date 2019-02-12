@@ -1,17 +1,17 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-import threading
-import multiprocessing
+# import threading
+# import multiprocessing
 import numpy as np
 from utils import *
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 class AC_Network():
   def __init__(self,a_size,scope,trainer):
     with tf.variable_scope(scope):
       #Input and visual encoding layers
-      self.state = tf.placeholder(shape=[None,3],dtype=tf.float32)
+      self.state = tf.placeholder(shape=[None, 240, 320, 3],dtype=tf.float32)
       self.prev_rewards = tf.placeholder(shape=[None,1],dtype=tf.float32)
       self.prev_actions = tf.placeholder(shape=[None],dtype=tf.int32)
       self.timestep = tf.placeholder(shape=[None,1],dtype=tf.float32)
