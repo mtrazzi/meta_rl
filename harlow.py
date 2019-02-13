@@ -50,7 +50,7 @@ class WrapperEnv(object):
 
   def step(self, action):
     done = not self.env.is_running()
-    if (done):
+    if (done or self.env.num_steps() > 3600):
       self.reset()
     obs = self.env.observations()
     reward = self.env.step(action, num_steps=1)
@@ -80,7 +80,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     config['video'] = video
   env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
 
-  dir_name = "/sgoinfre/goinfre/Perso/mtrazzi/python2_lab/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
+  dir_name = "/sgoinfre/goinfre/Perso/kcosta/lab/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
 
   # Hyperparameters for training/testing
   gamma = .91

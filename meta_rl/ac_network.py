@@ -11,18 +11,22 @@ class AC_Network():
   def __init__(self,a_size,scope,trainer, width, height):
     with tf.variable_scope(scope):
       #Input and visual encoding layers
-      self.state = tf.placeholder(shape=[None, width, height, 3],dtype=tf.float32)
+      self.state = tf.placeholder(shape=[None, height, width, 3], dtype=tf.float32)
+
       #Added a conv layer as described here: https://github.com/awjuliani/Meta-RL/blob/master/A3C-Meta-Grid.ipynb
       #parameters: inputs, num_outputs, activation_fn
-      self.conv = slim.fully_connected(slim.flatten(self.state),16,activation_fn=tf.nn.elu)
-      self.prev_rewards = tf.placeholder(shape=[None,1],dtype=tf.float32)
-      self.prev_actions = tf.placeholder(shape=[None],dtype=tf.int32)
-      self.timestep = tf.placeholder(shape=[None,1],dtype=tf.float32)
-      self.prev_actions_onehot = tf.one_hot(self.prev_actions,a_size,dtype=tf.float32)
+      self.cnn_first_layer = tf.layers.conv2d(self.state, 16, (8, 8), strides=(4, 4))
+      self.cnn_second_layer = tf.layers.conv2d(self.cnn_first_layer, 32, (4, 4), strides=(2, 2))
+      self.conv = tf.contrib.layers.fully_connected(slim.flatten(self.cnn_second_layer), 256, activation_fn=tf.nn.relu)
+
+      self.prev_rewards = tf.placeholder(shape=[None, 1], dtype=tf.float32)
+      self.prev_actions = tf.placeholder(shape=[None], dtype=tf.int32)
+      self.timestep = tf.placeholder(shape=[None, 1], dtype=tf.float32)
+      self.prev_actions_onehot = tf.one_hot(self.prev_actions,a_size, dtype=tf.float32)
 
       hidden = tf.concat([slim.flatten(self.conv),self.prev_rewards,self.prev_actions_onehot,self.timestep],1)
       #Recurrent network for temporal dependencies
-      lstm_cell = tf.nn.rnn_cell.LSTMCell(48,state_is_tuple=True)
+      lstm_cell = tf.nn.rnn_cell.LSTMCell(256, state_is_tuple=True)
       c_init = np.zeros((1, lstm_cell.state_size.c), np.float32)
       h_init = np.zeros((1, lstm_cell.state_size.h), np.float32)
       self.state_init = [c_init, h_init]
