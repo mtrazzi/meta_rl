@@ -37,6 +37,12 @@ def normalized_columns_initializer(std=1.0):
     return tf.constant(out)
   return _initializer
 
+def desperate(var, var_name="Variable"):
+  print("\033[1;31m\n\n--------------------------------------------------------")
+  var_str = str(var)
+  print(var_name + "'s content:")
+  print(var_str)
+  print("--------------------------------------------------------\n\n\033[0m")
 
 #This code allows gifs to be saved of the training episode for use in the Control Center.
 def make_gif(filenames, fname, duration=1):
