@@ -5,7 +5,6 @@ import tensorflow.contrib.slim as slim
 import numpy as np
 from utils import *
 # import matplotlib.pyplot as plt
-import copy
 
 
 class AC_Network():
@@ -28,60 +27,64 @@ class AC_Network():
       ### BEGINNING RNN
       #################
 
-      # create 2 LSTMCells
-      rnn_layers = [tf.nn.rnn_cell.LSTMCell(size, state_is_tuple=True) for size in [256, 64]]
+      with tf.variable_scope('lstm1'):
+        #LSTM 1: x, r, t
+        hidden_1 = tf.concat([slim.flatten(self.conv), self.prev_rewards, self.timestep], 1)
 
-      #rnn takes as imput the output of the hidden (fully_connected) layer
-      #LSTM 1: x, r, t
-      hidden_1 = tf.concat([slim.flatten(self.conv), self.prev_rewards, self.timestep], 1)
-      desperate(hidden_1, "hidden_1")
-      rnn_in_1 = tf.expand_dims(hidden_1, [0])
-      desperate(rnn_in_1, "rnn_in_1")
+        #Recurrent network for temporal dependencies
+        lstm_cell_1 = tf.nn.rnn_cell.LSTMCell(256, state_is_tuple=True)
 
-      #LSTM 2: x, a, t
-      hidden_2 = tf.concat([slim.flatten(self.conv), self.prev_actions_onehot, self.timestep], 1)
-      desperate(hidden_2, "hidden_2")
-      rnn_in_2 = tf.expand_dims(hidden_2, [0])
-      desperate(rnn_in_2, "rnn_in_2")
+        c_init_1 = np.zeros((1, lstm_cell_1.state_size.c), np.float32)
+        h_init_1 = np.zeros((1, lstm_cell_1.state_size.h), np.float32)
+        # self.state_init = [c_init_1, h_init_1]
 
-      # create a RNN cell composed sequentially of a number of RNNCells
-      stacked_lstm = tf.nn.rnn_cell.MultiRNNCell(rnn_layers, state_is_tuple=True)
+        c_in_1 = tf.placeholder(tf.float32, [1, lstm_cell_1.state_size.c])
+        h_in_1 = tf.placeholder(tf.float32, [1, lstm_cell_1.state_size.h])
+        # self.state_in = (c_in_1, h_in_1)
 
-      #In the following lines: c: hidden state; h: output
+        rnn_in_1 = tf.expand_dims(hidden_1, [0])
+        step_size_1 = tf.shape(self.prev_rewards)[:1]
+        state_in_1 = tf.contrib.rnn.LSTMStateTuple(c_in_1, h_in_1)
 
-      #initialization of state_init (initialized to 0)
-      # c_init = np.zeros((1, stacked_lstm.state_size.c), np.float32)
-      # h_init = np.zeros((1, stacked_lstm.state_size.h), np.float32)
-      # self.state_init = [c_init, h_init]
+        lstm_outputs_1, lstm_state_1 = tf.nn.dynamic_rnn(
+          lstm_cell_1,
+          rnn_in_1,
+          initial_state=state_in_1,
+          sequence_length=step_size_1,
+          time_major=False)
 
-      #initialization of the size of tensors
-      # c_in = tf.placeholder(tf.float32, [1, stacked_lstm.state_size.c])
-      # h_in = tf.placeholder(tf.float32, [1, stacked_lstm.state_size.h])
-      # self.state_in = (c_in, h_in)
+        lstm_c_1, lstm_h_1 = lstm_state_1
+        rnn_out_1 = tf.reshape(lstm_outputs_1, [-1, 256])
 
-      #tuple used by LSTM cells. Stores (c,h) (==hidden state and output)
-      # state_in = tf.contrib.rnn.LSTMStateTuple(c_in, h_in)
+      with tf.variable_scope('lstm2'):
+        #LSTM 2: x, a, t
+        hidden_2 = tf.concat([slim.flatten(self.conv), slim.flatten(rnn_out_1), self.prev_actions_onehot, self.timestep], 1)
 
-      batch_size = 32
-      self.state_in = state_in = stacked_lstm.zero_state(batch_size, tf.float32)
-      self.state_init = stacked_lstm.zero_state(batch_size, tf.float32)
-      desperate(state_in)
+        lstm_cell_2 = tf.nn.rnn_cell.LSTMCell(64, state_is_tuple=True)
 
-      # step_size is the length of the _sequence_ (i.e. number of frames to take into account for a particular training?)
-      step_size = tf.shape(self.prev_rewards)[:1]
+        c_init_2 = np.zeros((1, lstm_cell_2.state_size.c), np.float32)
+        h_init_2 = np.zeros((1, lstm_cell_2.state_size.h), np.float32)
 
-      lstm_outputs, lstm_state = tf.nn.dynamic_rnn(
-        stacked_lstm,
-        rnn_in_2,
-        initial_state=state_in,
-        sequence_length=step_size,
-        time_major=False)
+        c_in_2 = tf.placeholder(tf.float32, [1, lstm_cell_2.state_size.c])
+        h_in_2 = tf.placeholder(tf.float32, [1, lstm_cell_2.state_size.h])
 
-      lstm_c, lstm_h = lstm_state
+        rnn_in_2 = tf.expand_dims(hidden_2, [0])
+        step_size_2 = tf.shape(self.prev_rewards)[:1]
+        state_in_2 = tf.contrib.rnn.LSTMStateTuple(c_in_2, h_in_2)
 
-      self.state_out = (lstm_c[:1, :], lstm_h[:1, :])
+        lstm_outputs_2, lstm_state_2 = tf.nn.dynamic_rnn(
+          lstm_cell_2,
+          rnn_in_2,
+          initial_state=state_in_2,
+          sequence_length=step_size_2,
+          time_major=False)
 
-      rnn_out = tf.reshape(lstm_outputs, [-1, 256 + 64])
+        lstm_c_2, lstm_h_2 = lstm_state_2
+        rnn_out = tf.reshape(lstm_outputs_2, [-1, 64])
+
+      self.state_in = [(c_in_1, c_in_2), (h_in_1, h_in_2)]
+      self.state_init = [[c_init_1, c_init_2], [h_init_1, h_init_2]]
+      self.state_out = [(lstm_c_1[:1, :], lstm_c_2[:1, :]), (lstm_h_1[:1, :], lstm_h_2[:1, :])]
 
       ### END RNN
       ###########

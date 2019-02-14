@@ -33,9 +33,11 @@ class AC_Network():
       c_in = tf.placeholder(tf.float32, [1, lstm_cell.state_size.c])
       h_in = tf.placeholder(tf.float32, [1, lstm_cell.state_size.h])
       self.state_in = (c_in, h_in)
+      desperate(self.state_in, "original self.state_in")
 
       hidden = tf.concat([slim.flatten(self.conv),self.prev_rewards,self.prev_actions_onehot,self.timestep],1)
       rnn_in = tf.expand_dims(hidden, [0])
+      desperate(rnn_in, "original rnn_in")
 
       step_size = tf.shape(self.prev_rewards)[:1]
       state_in = tf.contrib.rnn.LSTMStateTuple(c_in, h_in)
