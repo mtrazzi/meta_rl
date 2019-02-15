@@ -3,7 +3,7 @@ import tensorflow.contrib.slim as slim
 # import threading
 # import multiprocessing
 import numpy as np
-from utils import *
+from meta_rl.utils import *
 # import matplotlib.pyplot as plt
 
 

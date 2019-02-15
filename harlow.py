@@ -32,6 +32,8 @@ from meta_rl.worker import Worker
 
 from datetime import datetime
 
+MAX_STEP = 3600
+
 class WrapperEnv(object):
   """A gym-like wrapper environment for DeepMind Lab.
 
@@ -46,22 +48,31 @@ class WrapperEnv(object):
   def __init__(self, env, length):
     self.env = env
     self.length = length
+#     self.l = []
     self.reset()
 
   def step(self, action):
-    done = not self.env.is_running()
-    if (done or self.env.num_steps() > 3600):
+    done = not self.env.is_running() or self.env.num_steps() > MAX_STEP
+    if done:
       self.reset()
     obs = self.env.observations()
     reward = self.env.step(action, num_steps=1)
+    print("Increment! num_steps():", self.env.num_steps())
 
+#     self.l.append(obs['RGB_INTERLEAVED'])
+    
     return obs['RGB_INTERLEAVED'], reward, done, self.env.num_steps()
 
   def reset(self):
     self.env.reset()
     obs = self.env.observations()
-    return obs['RGB_INTERLEAVED']
 
+#     with open("/floyd/home/obs.npy", "bw") as file:
+#         d = np.array(self.l)
+#         file.write(d.dumps())
+#     self.l = []
+
+    return obs['RGB_INTERLEAVED']
 
 def run(length, width, height, fps, level, record, demo, demofiles, video):
   """Spins up an environment and runs the random agent."""
@@ -80,7 +91,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     config['video'] = video
   env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
 
-  dir_name = "/sgoinfre/goinfre/Perso/mtrazzi/python2_lab/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
+  dir_name = "/floyd/home/python/meta_rl/train_" + datetime.now().strftime("%m%d-%H%M%S")
 
   # Hyperparameters for training/testing
   gamma = .91

@@ -3,8 +3,8 @@ import tensorflow as tf
 # import threading
 # import multiprocessing
 import numpy as np
-from utils import *
-from ac_network import AC_Network
+from meta_rl.utils import *
+from meta_rl.ac_network import AC_Network
 # import matplotlib.pyplot as plt
 
 import os
@@ -222,13 +222,7 @@ class Worker():
           sess.run(self.increment)
         episode_count += 1
         if (episode_count % 1 == 0):
-          for _ in range(5):
-            print
-          print "#####################################################################################"
-          print ">>>>>>>>>>>>>>>>>>>                           " +   str(episode_count) + "            <<<<<<<<<<<<<<<<<<<<<<<<<<"
-          print "#####################################################################################"
-          for _ in range(5):
-            print
+          desperate(episode_count, "Episode Count:")
 
     if not train:
       self.plot(episode_count-1, train)
