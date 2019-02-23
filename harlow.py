@@ -33,7 +33,7 @@ from meta_rl.worker import Worker
 from datetime import datetime
 
 import threading
-import multiprocessing
+import multiprocessing as mp
 
 from skimage import data
 from skimage.color import rgb2gray
@@ -115,7 +115,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
   gamma = .9
   a_size = 2
   n_seeds = 1
-  num_episode_train = 1e5
+  num_episode_train = 2
   num_episode_test = 50
   collect_seed_transition_probs = []
   for seed_nb in range(n_seeds):
@@ -125,7 +125,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     frame_path = dir_name+'/frames_' + str(seed_nb)
     plot_path = dir_name+'/plots_' + str(seed_nb)
 #     load_model_path = "meta_rl/results/biorxiv/final/model_" + str(seed_nb) + "/model-20000"
-    load_model_path = "/floyd/home/python/trained_models/train_0221-132433/model_0/model-13390"
+    load_model_path = "/floyd/home/python/meta_rl/train_0221-132433/model_0/model-13400"
 
     # create the directories
     if not os.path.exists(model_path):
@@ -137,7 +137,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
     # in train don't load the model and set train=True
     # in test, load the model and set train=False
-    for train, load_model, num_episodes in [[True, True, num_episode_train]]: #[[True,False,num_episode_train], [False, True, num_episode_test]]:
+    for train, load_model, num_episodes in [[True, False, num_episode_train]]: #[[True,False,num_episode_train], [False, True, num_episode_test]]:
 
       print ("seed_nb is:", seed_nb)
 
@@ -176,8 +176,8 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
           saver.restore(sess,ckpt.model_checkpoint_path)
         else:
           sess.run(tf.global_variables_initializer())
-
-#         worker.work(gamma, sess, coord, saver, train, num_episodes)
+        
+        # old multi-threading code
         worker_threads = []
         for worker in workers:
           worker_work = lambda: worker.work(gamma,sess,coord,saver,train,num_episodes)
@@ -185,6 +185,24 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
           thread.start()
           worker_threads.append(thread)
         coord.join(worker_threads)
+        
+        # new multiprocessing code
+        
+#         def worker_function(worker):
+#             print("REALLY DOING ANYTHING MEANINGFUL HERE???")
+#             return worker.work(gamma,sess,coord,saver,train,num_episodes)
+        
+        
+
+#         print("starting")
+#         pool = mp.Pool(processes=num_workers)
+#         for worker in workers:
+#             my_function = worker_function(worker)
+#             results = pool.apply_async(my_function, args = ())
+# #         output = [p.get() for p in results]
+#         pool.close()
+#         pool.join()
+#         print("finished?")
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description=__doc__)

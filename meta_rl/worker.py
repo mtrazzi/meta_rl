@@ -1,7 +1,7 @@
-import tensorflow as tf
+# import tensorflow as tf
 import tensorflow.contrib.slim as slim
-import threading
-import multiprocessing
+# import threading
+import multiprocessing as mp
 import numpy as np
 from meta_rl.utils import *
 from meta_rl.ac_network import AC_Network
@@ -18,6 +18,55 @@ def _action(*entries):
 def deepmind_action_api(action):
   return random.choice(Worker.ACTION_LIST[action:action + 1])
 
+def episode(env, ac_network, sess, rnn_state):
+    episode_buffer = []
+    episode_values = []
+    episode_reward = 0
+    total_steps = 0
+    episode_step_count = 0
+    
+    d = False
+    r = 0
+    a = 0
+    t = 0
+    s = env.reset()
+    
+    while d == False:
+        #Take an action using probabilities from policy network output.
+        a_dist,v,rnn_state_new = sess.run([ac_network.policy,ac_network.value,ac_network.state_out],
+            feed_dict={
+            ac_network.state:[s],
+            ac_network.prev_rewards:[[r]],
+            ac_network.timestep:[[t]],
+            ac_network.prev_actions:[a],
+            ac_network.state_in[0]:rnn_state[0],
+            ac_network.state_in[1]:rnn_state[1]})
+
+        a = np.random.choice(a_dist[0],p=a_dist[0])
+        a = np.argmax(a_dist == a)
+        
+        #TODO: rnn_state_new???
+        rnn_state = rnn_state_new
+
+        #Translate your action (that is an int?) to DeepMind Lab's actions
+        action = deepmind_action_api(a)
+        
+        #Do the actual action (left or right) + action to come back to the center
+        s1,r,d,t = env.step(action)
+        if not d:
+            s1_,r_,d_,t_ = env.step(-action)
+            r += r_
+            d = d_
+
+        episode_buffer.append([s,a,r,t,d,v[0,0]])
+        episode_values.append(v[0,0])
+        episode_reward += r
+        total_steps += 1
+        episode_step_count += 1
+        s = s1
+    
+    return episode_buffer, episode_values, episode_reward, episode_step_count, rnn_state
+
 class Worker():
 
   ACTIONS = {
@@ -33,6 +82,7 @@ class Worker():
     self.width = width
     self.height = height
     self.name = "worker_" + str(name)
+    print("WORKER INIT for worker called >>", self.name, "<<")
     self.number = name
     self.model_path = model_path
     self.trainer = trainer
@@ -52,8 +102,10 @@ class Worker():
     self.plot_path = plot_path
     self.frame_path = frame_path
     self.list_time = []
+    self.episode_count = 0
 
   def train(self,rollout,sess,gamma,bootstrap_value):
+    print("WORKER TRAIN for worker called >>", self.name, "<<")
     rollout = np.array(rollout)
     states = rollout[:,0]
     actions = rollout[:,1]
@@ -97,7 +149,9 @@ class Worker():
     return v_l / len(rollout),p_l / len(rollout),e_l / len(rollout), g_n,v_n
 
   def work(self,gamma,sess,coord,saver,train, num_episodes):
+    print("WORKER WORK for worker called >>", self.name, "<<")
     episode_count = sess.run(self.global_episodes)
+    print("episode_count at this point is:", episode_count)
 
     # set count to zero when loading a model
     if not train:
@@ -105,66 +159,57 @@ class Worker():
 
     total_steps = 0
     print ("Starting worker " + str(self.number))
+    ### MAYBE DO MULTI-PROCESSING HERE INSTEAD???
     with sess.as_default(), sess.graph.as_default():
       while not coord.should_stop() and episode_count <= num_episodes:
         sess.run(self.update_local_ops)
-        episode_buffer = []
-        episode_values = []
-        episode_frames = []
-        episode_reward = 0
-        episode_step_count = 0
-        rnn_state = self.local_AC.state_init
-
-        for _ in range(1):
-          # to optimize for GPU, update on large batches of episodes
-          d = False
-          r = 0
-          a = 0
-          t = 0
-          s = self.env.reset()
-          
-          start_time = time.time()
-          while d == False:
-            #Take an action using probabilities from policy network output.
-            a_dist,v,rnn_state_new = sess.run([self.local_AC.policy,self.local_AC.value,self.local_AC.state_out],
-              feed_dict={
-              self.local_AC.state:[s],
-              self.local_AC.prev_rewards:[[r]],
-              self.local_AC.timestep:[[t]],
-              self.local_AC.prev_actions:[a],
-              self.local_AC.state_in[0]:rnn_state[0],
-              self.local_AC.state_in[1]:rnn_state[1]})
-
-            a = np.random.choice(a_dist[0],p=a_dist[0])
-            a = np.argmax(a_dist == a)
-
-            rnn_state = rnn_state_new
-
-            action = deepmind_action_api(a)
-            # s1,r,d,t = self.env.trial(action)
-            s1,r,d,t = self.env.step(action)
-            if not d:
-                s1_,r_,d_,t_ = self.env.step(-action)
-                r += r_
-                d = d_
-
-            episode_buffer.append([s,a,r,t,d,v[0,0]])
-            episode_values.append(v[0,0])
-            episode_reward += r
-            total_steps += 1
-            episode_step_count += 1
-            s = s1
         
-            
-          episode_count += 1
-          episode_time = time.time() - start_time
-          print("\033[92mWORKER NAME >> " + self.name + " << " + "s\033[0m")
-          print("\033[92mEpisode #" + str(episode_count) + " completed in (only) " + str(episode_time) + "s\033[0m")
-          self.list_time.append(episode_time)
-          if (episode_count % 10 == 0):
-            desperate(episode_count / num_episodes, "Progress (%):")
-            print("\033[34mMean time for the last 10 episodes was (only) " + str(np.mean(self.list_time)) + "s\033[0m")
-            self.list_time = []
+#         episode_buffer = [ [] for _ in range(num_processes) ]
+#         episode_values = [ [] for _ in range(num_processes) ]
+#         episode_frames = [ [] for _ in range(num_processes) ]
+        rnn_state = self.local_AC.state_init
+        
+        # starting the episode
+        start_time = time.time()
+        
+        ### START MULTIPROCESSING
+        #########################
+        
+        num_processes = 32
+        
+        # Define an output queue
+        output = mp.Queue()
+        
+        # Setup a list of processes that we want to run
+        processes = [mp.Process(target=episode, args=(self.env, self.local_AC, sess, rnn_state)) for i in range(num_processes)]
+        
+        # Run processes
+        for p in processes:
+            p.start()
+        
+        # Exit the completed processes
+        for p in processes:
+            p.join()
+        
+        # Get process results from the output queue
+        results = [output.get() for p in processes]
+        
+        episode_buffer, episode_values, episode_reward, episode_step_count, rnn_state = results[0]
+
+        #####episode_buffer, episode_values, episode_reward, episode_step_count, rnn_state = episode(self.env, self.local_AC, sess, rnn_state)
+        
+        ### END MULTIPROCESSING
+        #######################
+        
+        # book-keeping
+        episode_count += 1
+        episode_time = time.time() - start_time
+        print("\033[92mEpisode #" + str(episode_count) + " completed in (only) " + str(episode_time) + "s\033[0m")
+        self.list_time.append(episode_time)
+        if (episode_count % 10 == 0):
+          desperate(episode_count / num_episodes, "Progress (%):")
+          print("\033[34mMean time for the last 10 episodes was (only) " + str(np.mean(self.list_time)) + "s\033[0m")
+        self.list_time = []  
 
         self.episode_rewards.append(episode_reward)
         self.episode_lengths.append(episode_step_count)
@@ -179,8 +224,8 @@ class Worker():
           print("\033[31mWORKER " + self.name + " finished training in only " + str(time_to_train) + "s, so fast!!!" + "\033[0m")
 
         # Periodically save gifs of episodes, model parameters, and summary statistics.
-        if episode_count % 10 == 0 and episode_count != 0:
-          if episode_count % 10 == 0 and self.name == 'worker_0':
+        if episode_count % 1 == 0 and episode_count != 0:
+          if episode_count % 1 == 0 and self.name == 'worker_0':
             if train == True:
               # save model
               os.makedirs(self.model_path+'/model-'+str(episode_count))
