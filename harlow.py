@@ -38,9 +38,18 @@ import multiprocessing
 from skimage import data
 from skimage.color import rgb2gray
 
+# Padding pour n'avoir que le screen, sans le décors
+WIDTH_PAD  = 18 # 19 if we dont want 1 pixel surrounding image
+HEIGHT_PAD = 30 # 31 if we dont want 1 pixel surrounding image
+
 def process_obs(obs):
     black_and_white = rgb2gray(obs)
-    return black_and_white[1][1:3]
+    left, right = np.hsplit(black_and_white[HEIGHT_PAD:-HEIGHT_PAD, WIDTH_PAD:-WIDTH_PAD], 2)
+    
+    mean = np.array([left.mean(), right.mean()])
+    one_hot = np.zeros_like(mean)
+    one_hot[np.where(mean == np.max(mean))] = 1
+    return one_hot
 
 class WrapperEnv(object):
   """A gym-like wrapper environment for DeepMind Lab.
@@ -60,25 +69,21 @@ class WrapperEnv(object):
     self.reset()
 
   def step(self, action):
-    tmp_obs = self.env.observations()
-
-    reward = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc), num_steps=1)
-    self.l.append(process_obs(tmp_obs['RGB_INTERLEAVED']))
-    
     done = not self.env.is_running() or self.env.num_steps() > 3600
     if done:
       self.reset()
     
-    print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
     # real step
     obs = self.env.observations()
-    reward += self.env.step(action, num_steps=1)
-    self.l.append(process_obs(obs['RGB_INTERLEAVED']))
+    reward = self.env.step(action, num_steps=1)
+    self.l.append(obs['RGB_INTERLEAVED'])
 
     if reward > 0:
-        print("\033[1;32mTrial reward: " + str(reward) + " :)\033[0m")
-    else:
-        print("\033[1;31mTrial reward: " + str(reward) + " :(\033[0m")
+        print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
+        print("\033[1;32mTrial reward: " + str(reward) + "\033[0m")
+    elif reward < 0:
+        print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
+        print("\033[1;31mTrial reward: " + str(reward) + "\033[0m")
     return process_obs(obs['RGB_INTERLEAVED']), reward, done, self.env.num_steps()
 
   def reset(self):
@@ -87,8 +92,10 @@ class WrapperEnv(object):
 
     d = np.array(self.l)
     if (len(d) > 2):
-        with open("/floyd/home/obs2.npy", "bw") as file:
+        with open("/floyd/home/obs.npy", "bw") as file:
             file.write(d.dumps())
+        
+        print("\033[32mModel's Log Saved\033[0m")
     self.l = []
 
     return process_obs(obs['RGB_INTERLEAVED'])
@@ -124,8 +131,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
     model_path = dir_name+'/model_' + str(seed_nb)
     frame_path = dir_name+'/frames_' + str(seed_nb)
     plot_path = dir_name+'/plots_' + str(seed_nb)
-#     load_model_path = "meta_rl/results/biorxiv/final/model_" + str(seed_nb) + "/model-20000"
-    load_model_path = "/floyd/home/python/trained_models/train_0221-132433/model_0/model-13390"
+    load_model_path = "meta_rl/results/biorxiv/final/model_" + str(seed_nb) + "/model-20000"
 
     # create the directories
     if not os.path.exists(model_path):
@@ -137,13 +143,13 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
     # in train don't load the model and set train=True
     # in test, load the model and set train=False
-    for train, load_model, num_episodes in [[True, True, num_episode_train]]: #[[True,False,num_episode_train], [False, True, num_episode_test]]:
+    for train, load_model, num_episodes in [[True, False, num_episode_train]]: #[[True,False,num_episode_train], [False, True, num_episode_test]]:
 
       print ("seed_nb is:", seed_nb)
 
       tf.reset_default_graph()
 
-      with tf.device("/device:GPU:0"):
+      with tf.device("/cpu:0"):
         global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
         trainer = tf.train.RMSPropOptimizer(learning_rate=7e-4)
         master_network = AC_Network(a_size,'global',None, width, height) # Generate global network
@@ -162,8 +168,8 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
         saver = tf.train.Saver(max_to_keep=5)
 
       config_t = tf.ConfigProto(allow_soft_placement = True)
-      config_t.intra_op_parallelism_threads = 3000
-      config_t.inter_op_parallelism_threads = 3000
+#       config_t.intra_op_parallelism_threads = 3000
+#       config_t.inter_op_parallelism_threads = 3000
       with tf.Session(config = config_t) as sess:
         # set the seed
         np.random.seed(seed_nb)

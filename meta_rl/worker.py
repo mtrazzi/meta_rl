@@ -141,12 +141,19 @@ class Worker():
             rnn_state = rnn_state_new
 
             action = deepmind_action_api(a)
+            
+            
             # s1,r,d,t = self.env.trial(action)
-            s1,r,d,t = self.env.step(action)
+            _, r_, _, _ = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+            s1, r, d, t = self.env.step(action)
+            print(s1)
+            r += r_
             if not d:
-                s1_,r_,d_,t_ = self.env.step(-action)
+                _, r_, d_, _ = self.env.step(-action)
                 r += r_
                 d = d_
+                _, r_, _, _ = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+                r += r_
 
             episode_buffer.append([s,a,r,t,d,v[0,0]])
             episode_values.append(v[0,0])
