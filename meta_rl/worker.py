@@ -149,11 +149,11 @@ class Worker():
             print(s1)
             r += r_
             if not d:
-                _, r_, d_, _ = self.env.step(-action)
+                _, r_, d, _ = self.env.step(-action)
                 r += r_
-                d = d_
-                _, r_, _, _ = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
-                r += r_
+                if not d:
+                    _, r_, d, _ = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+                    r += r_
 
             episode_buffer.append([s,a,r,t,d,v[0,0]])
             episode_values.append(v[0,0])
