@@ -6,13 +6,13 @@ import numpy as np
 from meta_rl.utils import *
 # import matplotlib.pyplot as plt
 
-
+DATASET_SIZE = 2
 
 class AC_Network():
   def __init__(self, a_size, scope, trainer):
     with tf.variable_scope(scope):
       #Input and visual encoding layers
-      self.state = tf.placeholder(shape=[None, 2, 2], dtype=tf.float32)
+      self.state = tf.placeholder(shape=[None, 2, DATASET_SIZE], dtype=tf.float32)
       self.prev_rewards = tf.placeholder(shape=[None,1],dtype=tf.float32)
       self.prev_actions = tf.placeholder(shape=[None],dtype=tf.int32)
       self.timestep = tf.placeholder(shape=[None,1],dtype=tf.float32)
