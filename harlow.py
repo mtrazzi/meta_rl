@@ -92,11 +92,10 @@ class WrapperEnv(object):
       env (deepmind_lab.Lab): DeepMind Lab environment.
 
   """
-  def __init__(self, env, length, seed):
+  def __init__(self, env, length):
     self.env = env
     self.length = length
     self.l = []
-    self.seed = seed
     self.reset()
 
   def step(self, action, true_action=False):
@@ -121,7 +120,7 @@ class WrapperEnv(object):
     return process_obs(obs['RGB_INTERLEAVED'], true_action), reward, done, self.env.num_steps()
 
   def reset(self):
-    self.env.reset(seed=self.seed)
+    self.env.reset()
     obs = self.env.observations()
 
     d = np.array(self.l)
@@ -193,7 +192,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
         env_list = [deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config) for _ in range(num_workers)]
         for i in range(num_workers):
             env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
-            workers.append(Worker(WrapperEnv(env_list[i], length, seed_nb), i, a_size, trainer, model_path, global_episodes))
+            workers.append(Worker(WrapperEnv(env_list[i], length), i, a_size, trainer, model_path, global_episodes))
 
         saver = tf.train.Saver(max_to_keep=5)
 
