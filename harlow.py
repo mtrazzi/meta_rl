@@ -110,12 +110,14 @@ class WrapperEnv(object):
 
     self.l.append(obs['RGB_INTERLEAVED'])
 
+    if true_action:
+      print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
+
     if reward > 0:
-        print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
         print("\033[1;32mTrial reward: " + str(reward) + "\033[0m")
     elif reward < 0:
-        print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
         print("\033[1;31mTrial reward: " + str(reward) + "\033[0m")
+
     return process_obs(obs['RGB_INTERLEAVED'], true_action), reward, done, self.env.num_steps()
 
   def reset(self):
