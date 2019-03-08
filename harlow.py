@@ -35,6 +35,52 @@ from datetime import datetime
 import threading
 import multiprocessing
 
+from skimage import data
+from skimage.color import rgb2gray
+
+DATASET_SIZE = 2
+
+# Padding
+WIDTH_PAD  = 18 # 19 if we dont want 1 pixel surrounding image
+HEIGHT_PAD = 30 # 31 if we dont want 1 pixel surrounding image
+
+MEAN_LEFT_IDX = -1
+MEAN_LEFT = np.zeros(DATASET_SIZE)
+MEAN_RIGHT_IDX = -1
+MEAN_RIGHT = np.zeros(DATASET_SIZE)
+
+
+def process_obs(obs, true_action=False):
+    global MEAN_LEFT_IDX, MEAN_LEFT, MEAN_RIGHT_IDX, MEAN_RIGHT
+
+    black_and_white = rgb2gray(obs)
+    left, right = np.hsplit(black_and_white[HEIGHT_PAD:-HEIGHT_PAD, WIDTH_PAD:-WIDTH_PAD], 2)
+
+    one_hot_left = np.zeros(DATASET_SIZE)
+    one_hot_right = np.zeros(DATASET_SIZE)
+
+    if not true_action:
+      return np.stack([one_hot_left, one_hot_right])
+
+    out = np.where(MEAN_LEFT == left.mean())[0]
+    if out.size == 0:
+      MEAN_LEFT_IDX += 1
+      idx = MEAN_LEFT_IDX
+      MEAN_LEFT[idx] = left.mean()
+    else:
+      idx = out[0]
+    one_hot_left[idx] = 1
+    out = np.where(MEAN_RIGHT == right.mean())[0]
+    if out.size == 0:
+      MEAN_RIGHT_IDX += 1
+      idx = MEAN_RIGHT_IDX
+      MEAN_RIGHT[idx] = right.mean()
+    else:
+      idx = out[0]
+    one_hot_right[idx] = 1
+
+    return np.stack([one_hot_left, one_hot_right])
+
 class WrapperEnv(object):
   """A gym-like wrapper environment for DeepMind Lab.
 
@@ -52,26 +98,24 @@ class WrapperEnv(object):
     self.l = []
     self.reset()
 
-  def step(self, action):
-    tmp_obs = self.env.observations()
-    reward = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc), num_steps=1)
-    self.l.append(tmp_obs['RGB_INTERLEAVED'])
-    
+  def step(self, action, true_action=False):
     done = not self.env.is_running() or self.env.num_steps() > 3600
     if done:
       self.reset()
-    
-    print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
+
     # real step
     obs = self.env.observations()
-    reward += self.env.step(action, num_steps=1)
+    reward = self.env.step(action, num_steps=1)
+
     self.l.append(obs['RGB_INTERLEAVED'])
 
     if reward > 0:
-        print("\033[1;32mTrial reward: " + str(reward) + " :)\033[0m")
-    else:
-        print("\033[1;31mTrial reward: " + str(reward) + " :(\033[0m")
-    return obs['RGB_INTERLEAVED'], reward, done, self.env.num_steps()
+        print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
+        print("\033[1;32mTrial reward: " + str(reward) + "\033[0m")
+    elif reward < 0:
+        print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
+        print("\033[1;31mTrial reward: " + str(reward) + "\033[0m")
+    return process_obs(obs['RGB_INTERLEAVED'], true_action), reward, done, self.env.num_steps()
 
   def reset(self):
     self.env.reset()
@@ -81,9 +125,11 @@ class WrapperEnv(object):
     if (len(d) > 2):
         with open("/floyd/home/obs.npy", "bw") as file:
             file.write(d.dumps())
+
+        print("\033[32mModel's Log Saved\033[0m")
     self.l = []
 
-    return obs['RGB_INTERLEAVED']
+    return process_obs(obs['RGB_INTERLEAVED'])
 
 def run(length, width, height, fps, level, record, demo, demofiles, video):
   """Spins up an environment and runs the random agent."""
@@ -128,7 +174,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
     # in train don't load the model and set train=True
     # in test, load the model and set train=False
-    for train, load_model, num_episodes in [[True, False, num_episode_train]]: #[[True,False,num_episode_train], [False, True, num_episode_test]]:
+    for train, load_model, num_episodes in [[True, False, num_episode_train]]:
 
       print ("seed_nb is:", seed_nb)
 
@@ -136,25 +182,19 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
       with tf.device("/cpu:0"):
         global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
-        trainer = tf.train.RMSPropOptimizer(learning_rate=7e-4)
-        master_network = AC_Network(a_size,'global',None, width, height) # Generate global network
+        trainer = tf.train.RMSPropOptimizer(learning_rate=1e-3)
+        master_network = AC_Network(a_size, 'global', None) # Generate global network
         num_workers = 1
         workers = []
         # Create worker classes
         env_list = [deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config) for _ in range(num_workers)]
         for i in range(num_workers):
             env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
-            workers.append(Worker(WrapperEnv(env_list[i], length), i, a_size, trainer,
-                model_path, global_episodes, make_gif=False,
-                collect_seed_transition_probs=collect_seed_transition_probs,
-                plot_path=plot_path, frame_path=frame_path,
-                width=width, height=height))
-                           
+            workers.append(Worker(WrapperEnv(env_list[i], length), i, a_size, trainer, model_path, global_episodes))
+
         saver = tf.train.Saver(max_to_keep=5)
 
       config_t = tf.ConfigProto(allow_soft_placement = True)
-#       config_t.intra_op_parallelism_threads = 3000
-#       config_t.inter_op_parallelism_threads = 3000
       with tf.Session(config = config_t) as sess:
         # set the seed
         np.random.seed(seed_nb)
@@ -168,7 +208,6 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
         else:
           sess.run(tf.global_variables_initializer())
 
-#         worker.work(gamma, sess, coord, saver, train, num_episodes)
         worker_threads = []
         for worker in workers:
           worker_work = lambda: worker.work(gamma,sess,coord,saver,train,num_episodes)
