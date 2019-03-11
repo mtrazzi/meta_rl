@@ -6,7 +6,7 @@ import numpy as np
 from meta_rl.utils import *
 # import matplotlib.pyplot as plt
 
-DATASET_SIZE = 2
+DATASET_SIZE = 42
 
 class AC_Network():
   def __init__(self, a_size, scope, trainer):

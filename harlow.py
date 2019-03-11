@@ -38,7 +38,7 @@ import multiprocessing
 from skimage import data
 from skimage.color import rgb2gray
 
-DATASET_SIZE = 2
+DATASET_SIZE = 42
 
 # Padding
 WIDTH_PAD  = 18 # 19 if we dont want 1 pixel surrounding image
@@ -182,7 +182,7 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
 
       tf.reset_default_graph()
 
-      with tf.device("/cpu:0"):
+      with tf.device("/device:GPU:0"):
         global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
         trainer = tf.train.RMSPropOptimizer(learning_rate=1e-3)
         master_network = AC_Network(a_size, 'global', None) # Generate global network
@@ -197,6 +197,8 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
         saver = tf.train.Saver(max_to_keep=5)
 
       config_t = tf.ConfigProto(allow_soft_placement = True)
+      config_t.intra_op_parallelism_threads = 3000
+      config_t.inter_op_parallelism_threads = 3000
       with tf.Session(config = config_t) as sess:
         # set the seed
         np.random.seed(seed_nb)
