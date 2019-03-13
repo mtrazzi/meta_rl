@@ -18,6 +18,66 @@ def _action(*entries):
 def deepmind_action_api(action):
   return random.choice(Worker.ACTION_LIST[action:action + 1])
 
+# this function returns 5 things, so num_return_vals=5
+@ray.remote(num_return_vals=5)
+def episode(reset, step, ac_network, sess, rnn_state):
+  episode_buffer = []
+  episode_reward = 0
+  total_steps = 0
+  episode_step_count = 0
+
+  d = False
+  r = 0
+  a = 0
+  t = 0
+  s = reset()
+
+  # Allow us to remove noise when starting episode
+  for i in range(5):
+    _, r_, _, _ = step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+
+  while d == False:
+    #Take an action using probabilities from policy network output.
+    a_dist,v,rnn_state_new = sess.run([ac_network.policy,ac_network.value,ac_network.state_out],
+      feed_dict={
+      ac_network.state:[s],
+      ac_network.prev_rewards:[[r]],
+      ac_network.timestep:[[t]],
+      ac_network.prev_actions:[a],
+      ac_network.state_in[0]:rnn_state[0],
+      ac_network.state_in[1]:rnn_state[1]})
+
+    a = np.random.choice(a_dist[0],p=a_dist[0])
+    a = np.argmax(a_dist == a)
+    rnn_state = rnn_state_new
+    action = deepmind_action_api(a)
+
+    """Objectif: Reduce action space to speed up training time
+
+    1st Action: No-Op, wait 1 frame to allow pictures to appears
+    2nd Action: True Action taken
+    3rd Action: Reverse action to go back at the center of the screen
+    4th Action: No-Op, to wait 1 frame to allow the cross to appears
+    """
+    _, r_, _, _ = step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+    s1, r, d, t = step(action, True)
+    r += r_
+    if not d:
+        _, r_, d, _ = step(-action)
+        r += r_
+        if not d:
+            _, r_, d, _ = step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+            r += r_
+
+    episode_buffer.append([s,a,r,t,d,v[0,0]])
+    episode_values.append(v[0,0])
+    episode_reward += r
+    total_steps += 1
+    episode_step_count += 1
+    s = s1
+
+  return episode_buffer, episode_values, episode_reward, episode_step_count, rnn_state
+
 class Worker():
 
   ACTIONS = {
@@ -44,68 +104,6 @@ class Worker():
     self.update_local_ops = update_target_graph('global',self.name)
     self.env = game
     self.list_time = []
-
-  # this function returns 5 things, so num_return_vals=5
-  @ray.remote(num_return_vals=5)
-  def episode(self, ac_network, sess, rnn_state):
-    env = self.env
-    episode_buffer = []
-    episode_values = []
-    episode_reward = 0
-    total_steps = 0
-    episode_step_count = 0
-
-    d = False
-    r = 0
-    a = 0
-    t = 0
-    s = env.reset()
-
-    # Allow us to remove noise when starting episode
-    for i in range(5):
-      _, r_, _, _ = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
-
-    while d == False:
-      #Take an action using probabilities from policy network output.
-      a_dist,v,rnn_state_new = sess.run([ac_network.policy,ac_network.value,ac_network.state_out],
-        feed_dict={
-        ac_network.state:[s],
-        ac_network.prev_rewards:[[r]],
-        ac_network.timestep:[[t]],
-        ac_network.prev_actions:[a],
-        ac_network.state_in[0]:rnn_state[0],
-        ac_network.state_in[1]:rnn_state[1]})
-
-      a = np.random.choice(a_dist[0],p=a_dist[0])
-      a = np.argmax(a_dist == a)
-      rnn_state = rnn_state_new
-      action = deepmind_action_api(a)
-
-      """Objectif: Reduce action space to speed up training time
-
-      1st Action: No-Op, wait 1 frame to allow pictures to appears
-      2nd Action: True Action taken
-      3rd Action: Reverse action to go back at the center of the screen
-      4th Action: No-Op, to wait 1 frame to allow the cross to appears
-      """
-      _, r_, _, _ = env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
-      s1, r, d, t = env.step(action, True)
-      r += r_
-      if not d:
-          _, r_, d, _ = env.step(-action)
-          r += r_
-          if not d:
-              _, r_, d, _ = env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
-              r += r_
-
-      episode_buffer.append([s,a,r,t,d,v[0,0]])
-      episode_values.append(v[0,0])
-      episode_reward += r
-      total_steps += 1
-      episode_step_count += 1
-      s = s1
-
-    return episode_buffer, episode_values, episode_reward, episode_step_count, rnn_state
 
   def train(self,rollout,sess,gamma,bootstrap_value):
     rollout = np.array(rollout)
@@ -175,7 +173,7 @@ class Worker():
         ray.init()
       
         # creates a task (result_id is a "object ID" in ray)
-        result_id = self.episode.remote(self.local_AC, sess, rnn_state)
+        result_id = episode.remote(self.env.reset, self.env.step, self.local_AC, sess, rnn_state)
       
         # create a python object from the object ID (or "remote job")
         episode_buffer, episode_values, episode_reward, episode_step_count, rnn_state = ray.get(result_id)

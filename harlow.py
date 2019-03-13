@@ -191,7 +191,6 @@ def run(length, width, height, fps, level, record, demo, demofiles, video):
         # Create worker classes
         env_list = [deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config) for _ in range(num_workers)]
         for i in range(num_workers):
-            env = deepmind_lab.Lab(level, ['RGB_INTERLEAVED'], config=config)
             workers.append(Worker(WrapperEnv(env_list[i], length), i, a_size, trainer, model_path, global_episodes))
 
         saver = tf.train.Saver(max_to_keep=5)
