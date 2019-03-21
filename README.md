@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="/img/meta_rl_glitch.gif" alt="Harlow Task">
+</p>
+
 ⚠**DISCLAIMER**⚠
 This is the git submodule for the Harlow task for my article [Meta-Reinforcement Learning](https://blog.floydhub.com/author/michaeltrazzi/) on FloydHub.
 - For the main repository for the Harlow task (with more information about the task) see [here](https://github.com/mtrazzi/harlow).
@@ -18,9 +22,23 @@ meta-rl
 # Branches
 
 - [`master`](https://github.com/mtrazzi/meta_rl): for this branch, the frames are pre-processed, on a dataset of 42 pictures of students from 42 (cf. the FloydHub blog for more details). Our model achieved 40% performance on this simplified version of the Harlow task.
+<p align="center">
+  <img src="/img/reward_cuve_5_seeds_42_images.png" alt="img/reward_cuve_5_seeds_42_images.png">
+</p>
+
 - [`dev`](https://github.com/mtrazzi/meta_rl/tree/dev): for this branch, we implemented a stacked LSTM + a convolutional network, to have exactly the same setup as in [Wang et al, 2018 Nature Neuroscience](https://www.nature.com/articles/s41593-018-0147-8). Here is the reward curve we obtained:
+
+<p align="center">
+  <img src="/img/conv_plus_stacked_lstm.png" alt="img/conv_plus_stacked_lstm.png">
+</p>
+
 - [`monothread2pixel`](https://github.com/mtrazzi/meta_rl/tree/monothread2pixel): here, we used for our dataset only a black image and a white image. We pre-processed those two images so our agent only sees a one-hot, that is either [0,1] or [1,0]. Here is the resulting reward curve after training:
+<p align="center">
+  <img src="/img/monothread2pixels.png" alt="img/monothread2pixels.png">
+</p>
+
 - [`multiprocessing`](https://github.com/mtrazzi/meta_rl/tree/multiprocessing): I implemented multiprocessing using Python’s library multiprocessing. However, it appeared that Tensorflow doesn’t allow to use multiprocessing after having imported tensorflow, so that multiprocessing branch came to a dead end.
+
 - [`ray`](https://github.com/mtrazzi/meta_rl/tree/ray): we also tried multiprocessing with ray  another multiprocessing library. However, it didn’t work out because DeepMind was not pickable, i.e. it couldn’t be serialized using pickle.
 
 # Todo
