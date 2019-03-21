@@ -1,5 +1,4 @@
 /bazel-*
-*.png
 WORSKPACE
 python.BUILD
 # Byte-compiled / optimized / DLL files
