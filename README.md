@@ -9,6 +9,12 @@ This is the git submodule for the Harlow task for my article [Meta-Reinforcement
 
 To get started, check out the parent [`README.md`](https://github.com/mtrazzi/harlow#getting-started).
 
+# Discussion
+
+I answer questions and give more informations here:
+- [Hacker news](https://news.ycombinator.com/item?id=19503985)
+- [r/MachineLearning](https://www.reddit.com/r/MachineLearning/comments/b688id/p_reimplementing_deepminds_metarl_papers/)
+
 # Directory structure
 
 ``` bash
